@@ -1,0 +1,369 @@
+jQuery(function($) {
+
+'use strict';
+
+var gfteClockActive = false;
+var	gftePageClockActive = [];
+	
+function gfteclock() {
+	if ($(".gfteStartTime input").length && $(".gfteStartTime input").val().length) {
+		$(".gftereadonly input").attr("readonly", true);
+        $(".gfteStartTime").show();
+        $(".gftetimertext").not(".gftehiddentimer").show();
+		$(".gftehidden").hide();
+		
+		if (!gfteClockActive) {
+			gfteClockActive = true;
+            
+			//Get variables from PHP
+            var gftebrowserTime = new Date();
+			var gftestartTime 	= $(".gfteStartTime input").val();
+			var gftetimerarray  = gftestartTime.split("%");
+			var gftebaseTime 	= new Date(gftetimerarray[0]);
+			var gfteinitialtime = gftetimerarray[0];
+			var gfteTimeLimiter	= gftetimerarray[1] === "none" ? "none" : parseInt(gftetimerarray[1]);
+			var gfteTimeSynch	= gftetimerarray[2] === "" ? "" : (parseInt(gftetimerarray[2]) * 1000);
+			var gfteTimeSyninit	= gftetimerarray[2] ? gftetimerarray[2] : '';
+			var gfteFormId		= gftetimerarray[3] ? gftetimerarray[3] : '';
+			var gfteBlockEdit	= gftetimerarray[4] ? gftetimerarray[4] : '';
+			var gfteAutoSubmit	= gftetimerarray[5] ? gftetimerarray[5] : '';
+			var gftePreciseTime	= gftetimerarray[6] ? gftetimerarray[6] : '';
+            var gfteStartPage	= gftetimerarray[7] ? gftetimerarray[7] : '';
+            var gfteCustomTime	= gftetimerarray[8] ? gftetimerarray[8] : '';
+            var gfteTimeOffset	= gftetimerarray[9] ? parseInt(gftetimerarray[9]) : Math.floor(gftebaseTime - gftebrowserTime);
+			var gfteLockedForm	= gftetimerarray[10] ? gftetimerarray[10] : 'false';
+            var gfteRedirect    = $("#gfteautoredirect").length ? $("#gfteautoredirect").html() : "";
+            var gfteClockendMsg = $("#gfteclockendmessage").length ? $("#gfteclockendmessage").html() : "Time Limit Reached";
+            
+			if (gftetimerarray.length < 10) {
+				$(".gfteStartTime input").attr("value", gftestartTime + '%' + gfteTimeOffset + '%' + gfteLockedForm + '%');
+			}
+			//GFTE LOCK FORM -for block edit or auto submit
+			var gtfeLockForm = function() {
+				gfteLockedForm	= 'true';
+				$(".gfteStartTime input").attr("value", gfteinitialtime + '%' + gfteTimeLimiter + '%' + gfteTimeSyninit + '%' + gfteFormId + '%' + gfteBlockEdit + '%' + gfteAutoSubmit + '%' + gftePreciseTime + '%' + gfteStartPage + '%' + gfteCustomTime + '%' + gfteTimeOffset + '%' + gfteLockedForm);
+			};
+			//Auto Submit Form
+			var gfteAutoSubmitter = function() {
+				if (gfteAutoSubmit) {
+					//$('#gform_' + gfteFormId + ' .gform_body').hide();
+                    $('.gform_page_fields, .gform_save_link, .gform_previous_button').hide();
+                    //$('#gform_' + gfteFormId).find(':input[value=Previous]').hide();
+					if(window['gf_submitting_' + gfteFormId]){
+						return false;
+					} 
+					window['gf_submitting_' + gfteFormId] = true;
+					$('#gform_' + gfteFormId).trigger('submit',[true]);//steps through remaining pages until submit
+					setTimeout(gfteAutoSubmitter, 100);
+				}
+			};
+            //Redirect page from Form
+			var gfteAutoRedirector = function() {
+				if (gfteRedirect) {
+                    $('#gform_' + gfteFormId + ' .gform_body').hide();
+					//window.location.href = gfteRedirect;
+					window.location.replace(gfteRedirect);
+					return true;
+				}
+			};
+			//Close down editing of form
+			var gtfereadonlyForm = function() {
+				if (gfteBlockEdit && !gfteAutoSubmit) {
+					$('#gform_' + gfteFormId).find(':input').not(':input[value=Submit], :input[value=Previous], :input[value=Next], :input[type=submit], .gfteNoBlock :input').attr({'readonly': 'readonly', 'style': 'pointer-events: none;', 'tabindex': '-1', 'focusable': 'false'});
+					$('#gform_' + gfteFormId + ' label').not('.gfteNoBlock label').attr({'readonly': 'readonly', 'style': 'pointer-events: none;'});
+                    $('#gform_' + gfteFormId).find('option:not(:selected)').not('.gfteNoBlock option').attr({'disabled': 'disabled'});
+					$(".gfteStartTime input").hide();
+				}
+			};
+			//Change field/element visibility
+			var gtfeChangeVisibility = function() {
+				$(".gfte-hide").hide().attr({'style': 'visibility: hidden; display: none !important;'});
+				$(".gfte-show").show().attr({'style': 'visibility: visible; display: block !important;'});	
+
+			};
+			//Custom time is up alert
+			var gfteTimesUpMessage = function() {
+				var gfte_message = $("#gftetimesupmessage").html();
+				if (gfteLockedForm === "false" && typeof(gfte_message) !== "undefined" && gfte_message !== null && gfte_message !== "" && gfteAutoSubmit === "" && gfteAutoSubmit === "" && $(".gfteStartTime input").length) {
+					alert($('#gftetimesupmessage').html());
+				}
+			};
+			//Variable Timed Events
+            var gftevarevents = function(gftevariruntime) {
+                var gftevaritimes = function(gftevaritimevalue) {
+                    var gftevartimefunction = gftevaritimevalue.split("::");
+                    if (Array.isArray(gftevartimefunction) && gftevartimefunction.length == 3 && !isNaN(parseFloat(gftevartimefunction[2])) && isFinite(gftevartimefunction[2])) {
+                        if (gftevariruntime >= gftevartimefunction[2]) {
+                            switch (gftevartimefunction[0]) {
+                               case "block":
+                                   $('#gform_' + gfteFormId + ' .' + gftevartimefunction[1]).find(':input, label').attr({'readonly': 'readonly', 'style': 'pointer-events: none;', 'tabindex': '-1', 'focusable': 'false'});
+                                   $('#gform_' + gfteFormId + ' .' + gftevartimefunction[1]).find('option:not(:selected)').attr({'disabled': 'disabled'});
+                                   break;   
+                               case "hide":
+                                   $('.' + gftevartimefunction[1]).hide().attr({'style': 'visibility: hidden; display: none !important;'});
+                                   break;
+                               case "show":
+                                   $('.' + gftevartimefunction[1]).show().attr({'style': 'visibility: visible; display: block !important;'});
+                                   break;   
+                               case "alert":
+                                    if (gftevariruntime == gftevartimefunction[2]) {
+                                        alert(gftevartimefunction[1]);
+                                        $("#gftetimedevents").html($("#gftetimedevents").html().replace(gftevaritimevalue, gftevaritimevalue + "::complete"));
+                                    }
+                                   break;
+                               default:
+                                    if (gftevariruntime == gftevartimefunction[2]) {
+                                        alert('"' + gftevartimefunction[1] + '" is not a valid option. You must use "block, hide, show, or alert". Check your Additional Timed Events entry for this time.');
+                                    $("#gftetimedevents").html($("#gftetimedevents").html().replace(gftevaritimevalue, gftevaritimevalue + "::complete"));
+                                    }
+                            }
+                        }
+                    }
+                };
+                if ($("#gftetimedevents").length && $("#gftetimedevents").html().length) {
+                    var gfteVariTime = $("#gftetimedevents").html().split(/\r?\n/);
+                    if (Array.isArray(gfteVariTime) && gfteVariTime.length) {
+                        gfteVariTime.forEach(gftevaritimes)
+                    }
+                }
+            };
+            //GFTE MAIN CLOCK            
+            var gfteclockwork = function() {
+				if ($(".gfteStartTime input").length) {
+					var gfteallseconds 	= Math.floor(((new Date() - gftebaseTime) + gfteTimeOffset) / 1000);                  
+					var gfteruntime		= gfteallseconds;
+					var gfte_runtime	= gfteTimeLimiter - gfteruntime;
+					var gfte_timesup	= function() {
+						$(".gfteCountdownTimer").html(gfteClockendMsg); //countdown
+						//$(".gfteCountupTimer").html(gfteClockendMsg); //countup
+					};
+					if (gfteallseconds > gfteTimeLimiter) {  //time limit reached
+						gfte_timesup();
+					}
+					var gftehours 		= Math.floor(gfteallseconds / 3600);
+					var gfte_hours 		= Math.floor(gfte_runtime / 3600);
+					gfteallseconds 		= gfteallseconds % 3600;
+					gfte_runtime 		= gfte_runtime % 3600;
+					var gfteminutes 	= Math.floor(gfteallseconds / 60);
+					var gfte_minutes 	= Math.floor(gfte_runtime / 60);
+					gfteallseconds 		= gfteallseconds % 60;
+					gfte_runtime 		= gfte_runtime % 60;
+					var gfteseconds 	= Math.floor(gfteallseconds);
+					var gfte_seconds 	= Math.floor(gfte_runtime);
+					if ($(".gfteseconds").length) {
+						$(".gfteseconds").html(gfteseconds);
+                        if (gfteminutes != 0) {
+                            $(".gfteminutes").html(gfteminutes);
+                            if ($(".gfteminutes").is(":hidden")) {
+                                $(".gfteminutes").show();
+                                $(".gfteminsseparator").show();
+                            }
+                        } else {
+                            if ($(".gfteminutes").is(":visible")) {
+                                $(".gfteminutes").hide();
+                                $(".gfteminsseparator").hide();
+                            }
+                        }
+                        if (gftehours != 0) {
+                            $(".gftehours").html(gftehours);
+                            if ($(".gftehours").is(":hidden")) {
+                                $(".gftehours").show();
+                                $(".gftehoursseparator").show();
+                            }
+                        } else {
+                            if ($(".gftehours").is(":visible")) {
+                                $(".gftehours").hide();
+                                $(".gftehoursseparator").hide();
+                            }
+                        }
+					}
+					if ($(".gfte-seconds").length) {
+						$(".gfte-seconds").html(gfte_seconds);
+						$(".gfte-minutes").html(gfte_minutes);
+						$(".gfte-hours").html(gfte_hours);
+                        if (!gfte_hours) {
+                            if ($(".gfte-hours").is(":visible")) {
+                                $(".gfte-hours").hide();
+                                $(".gfte-hoursseparator").hide();
+                            }
+                        }
+                        if (!gfte_minutes) {
+                            if ($(".gfte-minutes").is(":visible")) {
+                                $(".gfte-minutes").hide();
+                                $(".gfte-minsseparator").hide();
+                            }
+                        } else {
+                            if ($(".gfte-minutes").is(":hidden")) {
+                                $(".gfte-minutes").show();
+                                $(".gfte-minsseparator").show();
+                            }
+                        }
+					}                    
+					if ((gfteTimeLimiter !== "none" && gfteruntime >=  gfteTimeLimiter) || gfteLockedForm === "true") {
+						gtfereadonlyForm();
+						//gtfereadonlyFields();
+                        if (gfteAutoRedirector()) {
+							return;
+						}
+						gtfeChangeVisibility();
+						gfteAutoSubmitter();
+						gfteTimesUpMessage();
+						if (gfteLockedForm === "false") {
+							gtfeLockForm();
+						}
+					}
+                    //variable timed events trigger
+                    gftevarevents(gfteruntime);
+					
+				} else {
+					$(".gftetimertext").hide();
+				}
+			}
+            gfteclockwork();
+            setInterval(gfteclockwork, 1000);
+			//Get Server time via AJAX
+            var gfteservertimesynch = function() {
+                var gfteGetServerTime = new XMLHttpRequest();
+                gfteGetServerTime.open('HEAD', document.location, false);
+                gfteGetServerTime.send(null);
+                var gfteTimeReturn 	= new Date(gfteGetServerTime.getResponseHeader("DATE"));
+                var gftetimezoneOff = gfteTimeReturn.getTimezoneOffset();
+                gfteTimeReturn.setMinutes(gfteTimeReturn.getMinutes() + gftetimezoneOff);
+                var gftediffSecs 	= Math.floor(gfteTimeReturn - gftebaseTime) / 1000;
+                if ((gfteTimeLimiter !== "none" && gftediffSecs >=  gfteTimeLimiter) || gfteLockedForm === "true") {
+                    gtfereadonlyForm();
+                    //gtfereadonlyFields();
+					if (gfteAutoRedirector()) {
+                        return;
+                    }
+                    gtfeChangeVisibility();
+                    gfteAutoSubmitter();
+                    gfteTimesUpMessage();
+                    if (gfteLockedForm === "false") {
+                        gtfeLockForm();
+                    }
+					
+                }
+                //variable timed events trigger
+                gftevarevents(gftediffSecs);
+            }
+			if (gfteTimeSynch) {
+				setInterval(gfteservertimesynch, gfteTimeSynch);
+			}
+			//setTimeOut version
+		/*	if (gfteTimeSynch) {
+				var gfteTimeCompare = function(){
+					var gfteGetServerTime = new XMLHttpRequest();
+					gfteGetServerTime.open('HEAD', document.location, false);
+					gfteGetServerTime.send(null);
+					var gfteTimeReturn 	= gfteGetServerTime.getResponseHeader("DATE");
+					var gfteServerTime 	= new Date(gfteTimeReturn);
+					var gftetimediff 	= (gfteServerTime - gftebaseTime);
+					var gftediffSecs 	= Math.floor(gftetimediff / 1000);
+					$('#gfteoffsettime').html(gfteServerTime);
+					if (gftediffSecs >=  gfteTimeLimiter) {
+						$('#gform_submit_button_' + gfteFormId).click();
+					}
+					setTimeout(gfteTimeCompare, 10000);
+				};
+				gfteTimeCompare();
+			}*/
+		}
+	} else {
+       $(".gfteStartTime").hide();
+       $(".gftetimertext").hide();
+    }
+}
+
+//Page Clock Display
+function gftePageClock(current_page) {
+	if ($(".gfteStartTime input").length && $(".gfteStartTime input").val().length && $(".gftePageTime").length) {
+		
+		//var gftePageStart = Date.now();  //working non- ajax time calcs
+		$('.gftepageminutes, .gftepageminsseparator, .gftepagehours, .gftepagehoursseparator ').hide();
+				
+		if (!gftePageClockActive[current_page]) {
+            gftePageClockActive[current_page] = true;
+			var gfteUpdatePageClock = function() {
+
+                $(".gftePageTime.gftePageNumber_" + current_page).each(function() {
+                    var gftePageSecs        = 0;
+                    var gftePageTime 	  	= $(this).find('input').val();
+                    var gftePageTimeArray  	= gftePageTime.split("%");
+					var gftePageCounter		= gftePageTimeArray[3] ? +gftePageTimeArray[3] : 0;
+
+					//working non- ajax time calcs
+					//var gftePageCurrent		= Math.floor((Date.now() - gftePageStart) / 1000);
+					//gftePageSecs 			= Math.floor(+gftePageTimeArray[1]) + gftePageCurrent;
+					//alert (gftePageSecs);
+					//end working
+                    gftePageSecs 		= Math.floor(+gftePageTimeArray[1]) + gftePageCounter;
+                    var gftepagehours 	= Math.floor(gftePageSecs / 3600);
+                    gftePageSecs 		= gftePageSecs % 3600;
+                    var gftepageminutes = Math.floor(gftePageSecs / 60);
+                    gftePageSecs 		= gftePageSecs % 60;
+                    var gftepageseconds = Math.floor(gftePageSecs);
+                    
+                    //targeting display based on GF 2.5+ markup or legacy 
+                    var GFTEThis        = $(this).find('.gftepageseconds').length > 0 ? $(this) : $(this).siblings('.gftePageTimerText_' + current_page);
+                    GFTEThis.find('.gftepageseconds').html(gftepageseconds);
+                    if (gftepageminutes) {
+                        GFTEThis.find('.gftepageminutes').html(gftepageminutes);
+                        if (GFTEThis.find('.gftepageminutes').is(":hidden")) {
+                            GFTEThis.find('.gftepageminutes').show();
+                            GFTEThis.find('.gftepageminsseparator').show();
+                        }
+                    } else {
+                        if (GFTEThis.find('.gftepageminutes').is(":visible")) {
+                            GFTEThis.find('.gftepageminutes').hide();
+                            GFTEThis.find('.gftepageminsseparator').hide();
+                        }
+                    }
+                    if (gftepagehours) {
+                        GFTEThis.find('.gftepagehours').html(gftepagehours);
+                        if (GFTEThis.find('.gftepagehours').is(":hidden")) {
+                            GFTEThis.find('.gftepagehours').show();
+                            GFTEThis.find('.gftepagehoursseparator').show();
+                        }
+                    } else {
+                        if (GFTEThis.find('.gftepagehours').is(":visible")) {
+                            GFTEThis.find('.gftepagehours').hide();
+                            GFTEThis.find('.gftepagehoursseparator').hide();
+                        }
+                    }
+					
+					gftePageCounter = gftePageCounter + 1;
+					//var gftePageCurrent		= Math.floor((Date.now() - gftePageStart) / 1000); //working non- ajax time calcs
+					$(this).find('input').val(gftePageTimeArray[0] + '%' + gftePageTimeArray[1] + '%' + gftePageTimeArray[2] + '%' + gftePageCounter);
+                });
+            }
+		
+			gfteUpdatePageClock();
+			setInterval(gfteUpdatePageClock, 1000);
+		}
+	}
+}
+	
+$(document).ready(function() {
+    /*$(document).on('gform_post_render', function(event, form_id, current_page){ //needs a way to get current page without this function
+        gfteclock();
+    });*/
+	gfteclock(); 
+	var current_page = $(".gfte_current_page_print").html();  
+	gftePageClock(current_page);
+    $('.gftehidden').hide();
+});
+	
+$(document).on('gform_post_render', function(event, form_id, current_page) {
+    gfteclock();
+    gftePageClock(current_page);
+    $('.gftehidden').hide();
+});
+
+$(document).ajaxComplete(function() {
+	//gfteclock();
+    $('.gftehidden').hide();
+});
+
+
+});
